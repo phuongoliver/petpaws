@@ -22,6 +22,9 @@ export class CoopRoom {
             const username = user ? user.username : 'GUEST_' + Math.floor(Math.random() * 1000);
 
             try {
+                // Ensure user exists in the users table to prevent Foreign Key errors
+                await this.supabase.from('users').upsert({ username: username }, { onConflict: 'username' });
+
                 // Insert room
                 const { error: roomErr } = await this.supabase.from('rooms').insert([{
                     id: roomId,
@@ -35,7 +38,7 @@ export class CoopRoom {
                 await this._joinRoomInternal(roomId, username);
             } catch (err) {
                 console.error("Failed to create room:", err);
-                bus.emit('ROOM_ERROR', "Could not create room.");
+                bus.emit('ROOM_ERROR', err.message || "Could not create room.");
             }
         });
 
@@ -46,6 +49,9 @@ export class CoopRoom {
             const username = user ? user.username : 'GUEST_' + Math.floor(Math.random() * 1000);
 
             try {
+                // Ensure user exists in the users table to prevent Foreign Key errors
+                await this.supabase.from('users').upsert({ username: username }, { onConflict: 'username' });
+
                 // Check if room exists and is waiting
                 const { data, error } = await this.supabase.from('rooms').select('status').eq('id', roomId).single();
                 if (error || !data) throw new Error("Room not found");
