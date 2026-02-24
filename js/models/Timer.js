@@ -124,5 +124,22 @@ export class Timer {
         // Listen to logout to stop timer
         bus.on('REQUEST_LOGOUT', () => this.stopFocus());
         bus.on('APPROVE_BREAK', () => this.approveBreak());
+
+        // Co-op Room Integrations
+        bus.on('REMOTE_SESSION_STARTED', (payload) => {
+            if (!this.isRunning) {
+                // Optionally sync with payload's start_time or duration, but for MVP we just trigger start
+                this.startFocus();
+            }
+        });
+
+        bus.on('REMOTE_SESSION_FAILED', (reason) => {
+            if (this.isRunning) {
+                console.error("Co-op Room Failed!", reason);
+                this._failSession();
+                // Could trigger a UI alert here, e.g., via bus.emit('COOP_FAIL_ALERT', reason.failed_by_user);
+                alert(`Session failed because ${reason?.failed_by_user || 'someone'} left the app!`);
+            }
+        });
     }
 }

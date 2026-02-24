@@ -11,6 +11,8 @@ import { RoomView } from './views/RoomView.js';
 import { DashboardView } from './views/DashboardView.js';
 import { CollectionView } from './views/CollectionView.js';
 import { Storage } from './core/Storage.js';
+import { DatabaseClient } from './core/DatabaseClient.js';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from './core/supabaseConfig.js';
 
 function seedDemoAccounts() {
     const db = Storage.getDB();
@@ -51,10 +53,13 @@ function seedDemoAccounts() {
 
 document.addEventListener('DOMContentLoaded', () => {
     // 1. Initialize Models
+    const dbClient = new DatabaseClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const supabase = dbClient.getClient();
+
     const userModel = new User();
     const timerModel = new Timer();
     const petModel = new Pet(userModel);
-    const roomModel = new CoopRoom(); // MVP Co-op
+    const roomModel = new CoopRoom(supabase, userModel); // MVP Co-op
 
     // 2. Initialize Views
     const authView = new AuthView(userModel);
