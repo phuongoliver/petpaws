@@ -41,7 +41,13 @@ export class Timer {
         this.focusDurationMinutes = durationMinutes;
         const endTime = new Date(endTimeString).getTime();
         const now = new Date().getTime();
-        this.remainingSeconds = Math.max(0, Math.floor((endTime - now) / 1000));
+
+        // Calculate remaining seconds, but NEVER let it exceed the intended duration 
+        // (to avoid showing 10:05 for a 10:00 timer due to clock/latency mismatch)
+        let calculatedRemaining = Math.floor((endTime - now) / 1000);
+        calculatedRemaining = Math.min(calculatedRemaining, durationMinutes * 60);
+
+        this.remainingSeconds = Math.max(0, calculatedRemaining);
 
         bus.emit('SESSION_STARTED', { synced: true });
         this._startTick();
