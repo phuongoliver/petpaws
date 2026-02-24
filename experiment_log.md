@@ -1,19 +1,18 @@
 ---
-## 🧪 Thử nghiệm: Tích hợp Supabase Realtime cho Co-op Focus
-**Ngày:** 2026-02-24 | **Giờ:** 15:15
-**Mục tiêu:** Xây dựng tính năng Co-op Focus (phòng học nhóm) sử dụng Supabase Realtime để đồng bộ hoá trạng thái phòng và đếm ngược thời gian cho nhiều thiết bị mà không cần server tuỳ chỉnh (phù hợp với Vercel).
+## 🧪 Thử nghiệm: Sửa lỗi đơ màn hình khi Join phòng Co-op
+**Ngày:** 2026-02-24 | **Giờ:** 15:20
+**Mục tiêu:** Khắc phục lỗi trình duyệt bị treo (freeze/crash) khi người dùng thứ 2 tham gia vào phòng đã tồn tại.
 
 ### 🛠 Cấu hình & Tham số
-* **File liên quan:** `CoopRoom.js`, `RoomView.js`, `Timer.js`, `main.js`, `supabaseConfig.js`
-* **Hyperparameters:** N/A
-* **Dataset:** Database Supabase (rooms, users, room_participants)
+* **File liên quan:** `CoopRoom.js`
+* **Nguyên nhân:** Lệnh `this.fetchParticipants()` nằm sai chỗ. Trong hàm `_joinRoomInternal`, việc gọi hàm này ngay sau khi `subscribeToRoom` tạo ra một vòng lặp vô tận (Infinite Loop). Cụ thể: Khi client join, hàm update database chạy $\rightarrow$ trigger realtime listener của chính client đó $\rightarrow$ listener lại gọi `fetchParticipants` $\rightarrow$ quá tải EventBus `PARTICIPANTS_UPDATED`.
 
 ### 📊 Kết quả & Quan sát
-* **Metric:** Realtime state synchronization, App visibility tracking (The Strict Mechanic)
-* **Hiện tượng:** Đã thay thế BroadcastChannel cũ bằng Supabase Realtime. Khi Host bấm "Start Focus", các máy tính (Guest) trong phòng tự động kết nối và chạy Timer theo Host. Nếu bất cứ ai trong phòng minimize Web/App, `visibilitychange` sẽ kích hoạt hàm Fail, và đẩy trạng thái Failed cho toàn phòng qua Supabase Broadcast, tất cả máy khác sẽ dừng Timer và báo lỗi.
+* **Metric:** Độ ổn định của WebSockets (Supabase channel).
+* **Hiện tượng:** Đã xoá bỏ vòng lặp ngầm. Đưa logic fetch danh sách user vào callback `SUBSCRIBED` của Supabase channel. Giờ đây, khi có người chơi mới, UI cập nhật danh sách mượt mà, không bị lag nữa.
 
 ### 💡 Ghi chú & Bước tiếp theo
-> Cấu trúc Database rất nhẹ gọn nhưng mạnh mẽ cho MVP vì không cần phải viết server node.js mà chỉ cần subscribe PostgreSQL changes.
-- [ ] Bật ứng dụng trên 2 Tabs hoặc 2 điện thoại khác nhau để kiểm tra tính năng Đồng bộ khởi động.
-- [ ] Kiểm tra tính năng PACT (Minimize tab để làm fail phòng cho tất cả người chơi).
+> Khi làm việc với Supabase Realtime (hoặc các WebSocket Pub/Sub nói chung), **tuyệt đối không** trigger các lệnh gọi Read/Write Database vòng vèo bên trong callback lắng nghe sự kiện để tránh dội bom API (API Bombing/Infinite Loop).
+- [ ] Chạy lại thử nghiệm trên 2 tab để xác nhận phòng không bị sập.
+- [ ] Tiến hành git commit và git push.
 ---

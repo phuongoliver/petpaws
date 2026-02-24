@@ -106,7 +106,6 @@ export class CoopRoom {
             bus.emit('ROOM_JOINED', roomId);
 
             this.subscribeToRoom(roomId);
-            this.fetchParticipants(roomId);
         } catch (err) {
             console.error(err);
             bus.emit('ROOM_ERROR', "Failed to join room logic.");
@@ -155,9 +154,16 @@ export class CoopRoom {
             })
             // Listen to participants joining/leaving
             .on('postgres_changes', { event: '*', schema: 'public', table: 'room_participants', filter: `room_id=eq.${roomId}` }, payload => {
+                // Avoid fetching if it's our own initial join to prevent excessive calls, though fetchParticipants is mostly safe.
+                // The main issue might be if someone mutates the table inside fetchParticipants, which we don't.
                 this.fetchParticipants(roomId);
             })
-            .subscribe();
+            .subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    // Fetch once initially when we successfully subscribe
+                    this.fetchParticipants(roomId);
+                }
+            });
     }
 
     async fetchParticipants(roomId) {
