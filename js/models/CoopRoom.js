@@ -71,14 +71,30 @@ export class CoopRoom {
         // If local start AND isHost, update DB with settings so everyone else can sync
         bus.on('SESSION_STARTED', async (payload) => {
             if (this.isInRoom && this.isHost && !payload?.synced) {
-                // Determine duration. You could pass it via payload, or guess it. 
-                // A better approach is timer logic tells us duration. For now, assume payload has duration_minutes.
                 const durationMinutes = payload?.durationMinutes || 25;
 
                 await this.supabase.from('rooms').update({
                     status: 'running',
                     start_time: new Date().toISOString(),
                     settings: { duration_minutes: durationMinutes }
+                }).eq('id', this.roomId);
+            }
+        });
+
+        // If local stops manually
+        bus.on('SESSION_STOPPED', async (payload) => {
+            if (this.isInRoom && this.isHost && !payload?.synced) {
+                await this.supabase.from('rooms').update({
+                    status: 'stopped'
+                }).eq('id', this.roomId);
+            }
+        });
+
+        // When Host changes duration on the slider
+        bus.on('TIMER_DURATION_CHANGED', async (duration) => {
+            if (this.isInRoom && this.isHost) {
+                await this.supabase.from('rooms').update({
+                    settings: { duration_minutes: duration }
                 }).eq('id', this.roomId);
             }
         });
@@ -149,14 +165,22 @@ export class CoopRoom {
         if (this.channel) this.supabase.removeChannel(this.channel);
 
         this.channel = this.supabase.channel(`room_${roomId}`)
-            // Listen to rooms table updates (status changes)
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, payload => {
                 const newStatus = payload.new.status;
-                if (newStatus === 'running') {
+                const oldStatus = payload.old ? payload.old.status : null; // Warning: REPLICA IDENTITY might limit "old" payload depending on DB settings, but we mainly care about "new"
+
+                // Duration Sync (If in waiting state, update display for guests)
+                if (newStatus === 'waiting' && payload.new.settings?.duration_minutes) {
+                    bus.emit('REMOTE_DURATION_CHANGED', payload.new.settings.duration_minutes);
+                }
+
+                if (newStatus === 'running' && oldStatus !== 'running') {
                     bus.emit('REMOTE_SESSION_STARTED', payload.new);
                 } else if (newStatus === 'failed') {
                     console.error("Room failed from DB update!", payload.new.fail_reason);
                     bus.emit('REMOTE_SESSION_FAILED', payload.new.fail_reason);
+                } else if (newStatus === 'stopped') {
+                    bus.emit('REMOTE_SESSION_STOPPED');
                 } else if (newStatus === 'completed') {
                     bus.emit('REMOTE_SESSION_COMPLETED');
                 }

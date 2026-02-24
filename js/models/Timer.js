@@ -76,12 +76,12 @@ export class Timer {
         this._startTick();
     }
 
-    stopFocus() {
+    stopFocus(synced = false) {
         clearInterval(this.timerInterval);
         this.isFocusing = false;
         this.isOnBreak = false;
         this.remainingSeconds = 0;
-        bus.emit('SESSION_STOPPED');
+        bus.emit('SESSION_STOPPED', { synced });
     }
 
     _startTick() {
@@ -141,6 +141,13 @@ export class Timer {
         bus.on('APPROVE_BREAK', () => this.approveBreak());
 
         // Co-op Room Integrations
+        bus.on('REMOTE_DURATION_CHANGED', (minutes) => {
+            if (!this.isRunning) {
+                this.focusDurationMinutes = minutes;
+                this.remainingSeconds = minutes * 60;
+                bus.emit('TIMER_TICK', this.remainingSeconds);
+            }
+        });
         bus.on('REMOTE_SESSION_STARTED', (payload) => {
             if (!this.isRunning) {
                 // Determine end time. If the host set duration_minutes in settings, we add it to start_time
@@ -161,6 +168,12 @@ export class Timer {
                 this._failSession();
                 // Could trigger a UI alert here, e.g., via bus.emit('COOP_FAIL_ALERT', reason.failed_by_user);
                 alert(`Session failed because ${reason?.failed_by_user || 'someone'} left the app!`);
+            }
+        });
+
+        bus.on('REMOTE_SESSION_STOPPED', () => {
+            if (this.isRunning) {
+                this.stopFocus(true);
             }
         });
     }
