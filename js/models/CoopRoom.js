@@ -18,8 +18,7 @@ export class CoopRoom {
         bus.on('CREATE_ROOM', async () => {
             if (!this.supabase) return console.error("Supabase not initialized");
             const roomId = this.generateRoomId();
-            const user = this.userModel.getCurrentUser();
-            const username = user ? user.username : 'GUEST_' + Math.floor(Math.random() * 1000);
+            const username = this.userModel.username || 'GUEST_' + Math.floor(Math.random() * 1000);
 
             try {
                 // Ensure user exists in the users table to prevent Foreign Key errors
@@ -45,8 +44,7 @@ export class CoopRoom {
         // When user tries to JOIN a room
         bus.on('JOIN_ROOM', async (roomId) => {
             if (!this.supabase) return;
-            const user = this.userModel.getCurrentUser();
-            const username = user ? user.username : 'GUEST_' + Math.floor(Math.random() * 1000);
+            const username = this.userModel.username || 'GUEST_' + Math.floor(Math.random() * 1000);
 
             try {
                 // Ensure user exists in the users table to prevent Foreign Key errors
@@ -83,11 +81,11 @@ export class CoopRoom {
         // Fail session (strict mechanic triggered)
         bus.on('SESSION_FAILED', async () => {
             if (this.isInRoom) {
-                const user = this.userModel.getCurrentUser();
+                const username = this.userModel.username || 'Unknown';
                 await this.supabase.from('rooms').update({
                     status: 'failed',
                     fail_reason: {
-                        failed_by_user: user ? user.username : 'Unknown',
+                        failed_by_user: username,
                         timestamp: new Date().toISOString()
                     }
                 }).eq('id', this.roomId);
@@ -131,12 +129,12 @@ export class CoopRoom {
             this.channel = null;
         }
 
-        const user = this.userModel.getCurrentUser();
-        if (user) {
+        const username = this.userModel.username;
+        if (username) {
             // Remove from participants table
             await this.supabase.from('room_participants')
                 .delete()
-                .match({ room_id: oldRoom, username: user.username });
+                .match({ room_id: oldRoom, username: username });
         }
 
         bus.emit('ROOM_LEFT');
