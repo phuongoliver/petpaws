@@ -25,8 +25,7 @@ export class RoomView {
 
         if (this.createRoomBtn) {
             this.createRoomBtn.addEventListener('click', () => {
-                const randomId = Math.random().toString(36).substring(2, 8).toUpperCase();
-                bus.emit('JOIN_ROOM', randomId);
+                bus.emit('CREATE_ROOM');
             });
         }
 
