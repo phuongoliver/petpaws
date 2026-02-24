@@ -1,0 +1,128 @@
+import { bus } from '../core/EventBus.js';
+
+export class Timer {
+    constructor() {
+        this.focusDurationMinutes = 25;
+        this.remainingSeconds = 0;
+        this.timerInterval = null;
+        this.isFocusing = false;
+        this.isOnBreak = false;
+
+        this._bindVisibilityChange();
+    }
+
+    setDuration(minutes) {
+        if (!this.isFocusing) {
+            this.focusDurationMinutes = minutes;
+            bus.emit('TIMER_DURATION_CHANGED', this.focusDurationMinutes);
+        }
+    }
+
+    get isRunning() {
+        return this.isFocusing && !this.isOnBreak;
+    }
+
+    startFocus() {
+        if (this.isFocusing) return;
+        this.isFocusing = true;
+        this.isOnBreak = false;
+        this.remainingSeconds = this.focusDurationMinutes * 60;
+
+        bus.emit('SESSION_STARTED');
+        this._startTick();
+    }
+
+    resumeFocus() {
+        if (!this.isOnBreak) return;
+        this.isOnBreak = false;
+
+        bus.emit('SESSION_RESUMED');
+        this._startTick();
+    }
+
+    takeBreak() {
+        if (this.isFocusing || this.isOnBreak) return;
+
+        // Let the Pet/User system know a break was requested
+        // They will check if there's enough bones. 
+        // We emit an event and wait for approval.
+        bus.emit('REQUEST_BREAK');
+    }
+
+    // Called by Pet/User system if break is approved
+    approveBreak() {
+        this.isOnBreak = true;
+        clearInterval(this.timerInterval);
+
+        // Start a 5 min break timer
+        this.remainingSeconds = 5 * 60;
+        bus.emit('BREAK_STARTED');
+
+        this._startTick();
+    }
+
+    stopFocus() {
+        clearInterval(this.timerInterval);
+        this.isFocusing = false;
+        this.isOnBreak = false;
+        this.remainingSeconds = 0;
+        bus.emit('SESSION_STOPPED');
+    }
+
+    _startTick() {
+        clearInterval(this.timerInterval);
+        this.timerInterval = setInterval(() => {
+            if (this.remainingSeconds > 0) {
+                this.remainingSeconds--;
+
+                // Every 60 seconds (minute ticked), emit a tick event for rewards
+                if (this.remainingSeconds % 60 === 0 && this.remainingSeconds !== 0) {
+                    bus.emit('TIMER_MINUTE_PASSED');
+                }
+
+                bus.emit('TIMER_TICK', this.remainingSeconds);
+            } else {
+                this._finishCurrentState();
+            }
+        }, 1000);
+        bus.emit('TIMER_TICK', this.remainingSeconds);
+    }
+
+    _finishCurrentState() {
+        clearInterval(this.timerInterval);
+        if (this.isOnBreak) {
+            // Finished Break
+            this.isFocusing = false;
+            this.isOnBreak = false;
+            bus.emit('BREAK_ENDED');
+        } else {
+            // Finished Focus
+            this.isFocusing = false;
+            this.isOnBreak = false;
+            bus.emit('SESSION_SUCCESS');
+        }
+    }
+
+    _failSession() {
+        clearInterval(this.timerInterval);
+        this.isFocusing = false;
+        this.isOnBreak = false;
+        this.remainingSeconds = 0;
+        bus.emit('SESSION_FAILED');
+    }
+
+    _bindVisibilityChange() {
+        document.addEventListener("visibilitychange", () => {
+            if (document.hidden) {
+                // Strict mode: if minimizing/switching tabs while focusing (and not on break) -> Fail
+                if (this.isFocusing && !this.isOnBreak) {
+                    this._failSession();
+                }
+            }
+        });
+
+        // Listen to logout to stop timer
+        bus.on('REQUEST_LOGOUT', () => this.stopFocus());
+        bus.on('APPROVE_BREAK', () => this.approveBreak());
+    }
+}

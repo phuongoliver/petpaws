@@ -1,0 +1,16 @@
+{
+    "name": "Paws and Pause HTML Web",
+    "short_name": "PawsPause",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#FFD54F",
+    "theme_color": "#FFD54F",
+    "description": "A Pomodoro app with a virtual pet.",
+    "icons": [
+        {
+            "src": "https://upload.wikimedia.org/wikipedia/commons/4/4e/Bone-solid.svg",
+            "sizes": "192x192",
+            "type": "image/svg+xml"
+        }
+    ]
+}
