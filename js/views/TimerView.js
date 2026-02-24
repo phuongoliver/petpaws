@@ -60,6 +60,18 @@ export class TimerView {
         bus.on('SESSION_FAILED', () => this.renderIdleState());
         bus.on('BREAK_ENDED', () => this.renderIdleState());
 
+        // Co-op Room Listeners
+        bus.on('ROOM_JOINED', (payload) => {
+            this.inCoopRoom = true;
+            this.isHost = payload.isHost;
+            this.renderIdleState(); // Re-render to apply host/guest constraints
+        });
+        bus.on('ROOM_LEFT', () => {
+            this.inCoopRoom = false;
+            this.isHost = false;
+            this.renderIdleState();
+        });
+
         bus.on('USER_LOGGED_IN', (data) => {
             this.updateBonesDisplay(data.bones);
             this.updateCoinsDisplay(data.coins);
@@ -117,11 +129,28 @@ export class TimerView {
     }
 
     renderIdleState() {
-        if (this.sliderContainer) this.sliderContainer.style.display = 'block';
+        if (this.sliderContainer) {
+            // Only host can change duration in a room, or anyone if not in room
+            if (this.inCoopRoom && !this.isHost) {
+                this.sliderContainer.style.display = 'none';
+            } else {
+                this.sliderContainer.style.display = 'block';
+            }
+        }
+
         if (this.mainBtn) {
             this.mainBtn.textContent = 'START FOCUS';
             this.mainBtn.className = 'btn primary';
+
+            // Only host can start the room session
+            if (this.inCoopRoom && !this.isHost) {
+                this.mainBtn.disabled = true;
+                this.mainBtn.textContent = 'WAITING FOR HOST...';
+            } else {
+                this.mainBtn.disabled = false;
+            }
         }
+
         // Bones logic handles re-enabling feed button if Bones > 0 via BONES_UPDATED event
         this.updateDisplay(this.timer.focusDurationMinutes * 60);
     }

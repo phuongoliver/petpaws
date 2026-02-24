@@ -68,12 +68,17 @@ export class CoopRoom {
             await this.leaveRoom();
         });
 
-        // If local starts, update DB
-        bus.on('SESSION_STARTED', async () => {
-            if (this.isInRoom && this.isHost) {
+        // If local start AND isHost, update DB with settings so everyone else can sync
+        bus.on('SESSION_STARTED', async (payload) => {
+            if (this.isInRoom && this.isHost && !payload?.synced) {
+                // Determine duration. You could pass it via payload, or guess it. 
+                // A better approach is timer logic tells us duration. For now, assume payload has duration_minutes.
+                const durationMinutes = payload?.durationMinutes || 25;
+
                 await this.supabase.from('rooms').update({
                     status: 'running',
-                    start_time: new Date().toISOString()
+                    start_time: new Date().toISOString(),
+                    settings: { duration_minutes: durationMinutes }
                 }).eq('id', this.roomId);
             }
         });
@@ -107,7 +112,7 @@ export class CoopRoom {
 
             this.isInRoom = true;
             this.roomId = roomId;
-            bus.emit('ROOM_JOINED', roomId);
+            bus.emit('ROOM_JOINED', { roomId, isHost: this.isHost });
 
             this.subscribeToRoom(roomId);
         } catch (err) {

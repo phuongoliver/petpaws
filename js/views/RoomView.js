@@ -35,7 +35,7 @@ export class RoomView {
             });
         }
 
-        bus.on('ROOM_JOINED', (roomId) => this.renderInRoom(roomId));
+        bus.on('ROOM_JOINED', (payload) => this.renderInRoom(payload.roomId));
         bus.on('ROOM_LEFT', () => this.renderOutRoom());
     }
 

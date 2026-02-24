@@ -28,7 +28,22 @@ export class Timer {
         this.isOnBreak = false;
         this.remainingSeconds = this.focusDurationMinutes * 60;
 
-        bus.emit('SESSION_STARTED');
+        bus.emit('SESSION_STARTED', { durationMinutes: this.focusDurationMinutes });
+        this._startTick();
+    }
+
+    // New: Start focus with a specific end time (for Co-op sync)
+    startFocusWithEndTime(durationMinutes, endTimeString) {
+        if (this.isFocusing) return;
+        this.isFocusing = true;
+        this.isOnBreak = false;
+
+        this.focusDurationMinutes = durationMinutes;
+        const endTime = new Date(endTimeString).getTime();
+        const now = new Date().getTime();
+        this.remainingSeconds = Math.max(0, Math.floor((endTime - now) / 1000));
+
+        bus.emit('SESSION_STARTED', { synced: true });
         this._startTick();
     }
 
@@ -128,8 +143,15 @@ export class Timer {
         // Co-op Room Integrations
         bus.on('REMOTE_SESSION_STARTED', (payload) => {
             if (!this.isRunning) {
-                // Optionally sync with payload's start_time or duration, but for MVP we just trigger start
-                this.startFocus();
+                // Determine end time. If the host set duration_minutes in settings, we add it to start_time
+                const durationMinutes = payload.settings ? payload.settings.duration_minutes : 25;
+                if (payload.start_time) {
+                    const expectedEnd = new Date(new Date(payload.start_time).getTime() + durationMinutes * 60000).toISOString();
+                    this.startFocusWithEndTime(durationMinutes, expectedEnd);
+                } else {
+                    // Fallback
+                    this.startFocus();
+                }
             }
         });
 
